@@ -145,7 +145,7 @@
   .sheet-date{ margin-top:16px; font-size:14px; color:#333; }
 
   table{ width:100%; border-collapse: collapse; margin-top:28px; font-size:14px; }
-  th, td{ border: 1px solid #d7d8e4; text-align:center; height: 50px; }
+  th, td{ border: 1.5px solid #9294ab; text-align:center; height: 50px; }
   th{ background: var(--accent-soft); color: var(--purple-1); font-weight:800; font-size:13px; }
   td.num{ width: 9%; color: var(--muted); }
   td.pos{ width: 24%; }
@@ -155,7 +155,7 @@
   td.sign .waiting{ color:#c3c4d6; font-size:12px; font-weight:600; }
   tr.signed-row td.name{ color: var(--purple-1); }
 
-  .sheet-foot{ display:flex; justify-content:space-between; margin-top:20px; font-size:11px; color:#9d9eb2; }
+  .sheet-foot{ display:flex; justify-content:flex-end; margin-top:20px; font-size:11px; color:#9d9eb2; }
 
   .modal-overlay{
     position:fixed; inset:0; background: rgba(20,15,50,.45);
@@ -275,7 +275,6 @@
         </table>
 
         <div class="sheet-foot">
-          <span>이 영역은 정식 등록부 크기에 맞춰 인쇄됩니다 (A4 사이즈 자동 맞춤)</span>
           <span id="lastUpdateNote">Google Sheets 연동</span>
         </div>
       </div>
