@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>전자서명 등록부 시스템</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --purple-1: #4f3fce;
+    --purple-2: #6d3fce;
+    --ink: #1c1d2b;
+    --muted: #6b6d80;
+    --panel-bg: #f4f5fa;
+    --card-bg: #ffffff;
+    --card-border: #e6e7f0;
+    --green: #16a34a;
+    --red: #dc2626;
+    --accent-soft: #eef0fd;
+    --radius: 12px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family: "Pretendard","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    background: var(--panel-bg);
+    color: var(--ink);
+  }
+
+  /* ===== Top bar ===== */
+  .topbar{
+    background: linear-gradient(100deg, var(--purple-1), var(--purple-2));
+    color:#fff;
+    padding: 16px 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .topbar-left{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .logo-badge{
+    width:38px; height:38px;
+    background: rgba(255,255,255,.18);
+    border-radius:9px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px;
+    flex-shrink:0;
+  }
+  .topbar-title{
+    font-size:17px;
+    font-weight:800;
+    line-height:1.2;
+  }
+  .live-badge{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    background: rgba(255,255,255,.16);
+    padding:2px 9px;
+    border-radius: 999px;
+    font-size:11px;
+    font-weight:700;
+    margin-top:3px;
+  }
+  .live-badge .dot{
+    width:6px; height:6px; border-radius:50%;
+    background:#4ade80;
+    box-shadow: 0 0 0 0 rgba(74,222,128,.6);
+    animation: pulse 1.8s infinite;
+  }
+  .live-badge.local-mode .dot{
+    background:#fbbf24;
+    animation:none;
+    box-shadow:none;
+  }
+  .live-badge.local-mode{ background: rgba(251,191,36,.22); }
+  @keyframes pulse{
+    0%{ box-shadow: 0 0 0 0 rgba(74,222,128,.6); }
+    70%{ box-shadow: 0 0 0 6px rgba(74,222,128,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(74,222,128,0); }
+  }
+  .topbar-desc{
+    font-size:12px;
+    color: rgba(255,255,255,.78);
+    margin-top:2px;
+  }
+  .topbar-right{ display:flex; gap:8px; flex-wrap:wrap; }
+  .btn{
+    border:none;
+    padding:10px 16px;
+    border-radius:8px;
+    font-size:13px;
+    font-weight:700;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    transition: transform .1s, opacity .15s;
+    white-space:nowrap;
+  }
+  .btn:hover{ opacity:.9; }
+  .btn:active{ transform: scale(.97); }
+  .btn-pdf{ background: var(--green); color:#fff; }
+  .btn-reset{ background: var(--red); color:#fff; }
+  .btn-primary{ background: var(--purple-1); color:#fff; width:100%; justify-content:center; padding:13px; font-size:14px; }
+  .btn-ghost-sm{ background:#fff; color:var(--ink); border:1px solid #d7d8e4; font-size:11px; padding:5px 10px; }
+
+  /* ===== Layout ===== */
+  .layout{
+    display:grid;
+    grid-template-columns: 360px 1fr;
+    gap: 22px;
+    padding: 22px;
+    align-items:start;
+  }
+  @media (max-width: 980px){
+    .layout{ grid-template-columns: 1fr; }
+  }
+
+  .card{
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 18px 18px 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 1px 2px rgba(20,20,50,.04);
+  }
+  .card-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+  }
+  .card-head-left{
+    display:flex; align-items:center; gap:8px;
+    font-size:14px; font-weight:800;
+  }
+  .card-head-left .ico{
+    width:24px;height:24px;border-radius:6px;
+    background: var(--accent-soft); color: var(--purple-1);
+    display:flex;align-items:center;justify-content:center;font-size:13px;
+  }
+  .save-indicator{
+    font-size:11px;
+    font-weight:700;
+    color: var(--green);
+    display:flex; align-items:center; gap:4px;
+  }
+  .save-indicator.saving{ color:#c98a00; }
+  .save-indicator.error{ color: var(--red); }
+
+  label.field-label{
+    display:block;
+    font-size:12px;
+    color: var(--muted);
+    font-weight:700;
+    margin: 12px 0 6px;
+  }
+  label.field-label:first-child{ margin-top:0; }
+  .field-input{
+    width:100%;
+    border:1px solid #dcdde8;
+    border-radius:8px;
+    padding: 10px 12px;
+    font-size:14px;
+    outline:none;
+    color: var(--ink);
+    background:#fbfbfe;
+    transition: border-color .15s, background .15s;
+  }
+  .field-input:focus{
+    border-color: var(--purple-1);
+    background:#fff;
+  }
+  select.field-input{
+    cursor:pointer;
+    appearance:none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b6d80'><path d='M5.5 7.5l4.5 4.5 4.5-4.5z'/></svg>");
+    background-repeat:no-repeat;
+    background-position: right 10px center;
+    padding-right: 32px;
+  }
+  .hint-note{
+    font-size:11px;
+    color: var(--muted);
+    margin-top:6px;
+    line-height:1.5;
+  }
+  .hint-note.warn{ color:#b5730a; }
+
+  .pad-wrap{
+    position:relative;
+    margin-top:6px;
+  }
+  canvas#padCanvas{
+    width:100%;
+    height:168px;
+    border:1.5px dashed #c9cae0;
+    border-radius:10px;
+    touch-action:none;
+    background:#fcfcff;
+    display:block;
+  }
+  .pad-clear-btn{
+    position:absolute;
+    top:8px; right:8px;
+  }
+  .pad-placeholder{
+    position:absolute;
+    top:50%; left:50%;
+    transform: translate(-50%,-50%);
+    font-size:12px;
+    color:#b7b8cc;
+    pointer-events:none;
+  }
+
+  /* ===== A4 sheet ===== */
+  .sheet-outer{ display:flex; justify-content:center; }
+  .sheet{
+    width: 210mm;
+    max-width:100%;
+    min-height: 297mm;
+    background:#fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 24px rgba(30,20,80,.10);
+    padding: 18mm 16mm;
+  }
+  .sheet-head{ text-align:center; margin-bottom:8px; }
+  .sheet-title{
+    font-size:24px;
+    font-weight:800;
+    color: var(--ink);
+    padding-bottom:14px;
+    border-bottom: 3px solid var(--purple-1);
+    display:inline-block;
+    min-width:60%;
+  }
+  .sheet-date{
+    margin-top:16px;
+    font-size:14px;
+    color:#333;
+  }
+
+  table{
+    width:100%;
+    border-collapse: collapse;
+    margin-top:28px;
+    font-size:14px;
+  }
+  th, td{
+    border: 1px solid #d7d8e4;
+    text-align:center;
+    height: 50px;
+  }
+  th{
+    background: var(--accent-soft);
+    color: var(--purple-1);
+    font-weight:800;
+    font-size:13px;
+  }
+  td.num{ width: 9%; color: var(--muted); }
+  td.pos{ width: 24%; }
+  td.name{ width: 22%; font-weight:700; }
+  td.sign{ width: 45%; position:relative; }
+  td.sign img{ max-height: 36px; max-width: 85%; }
+  td.sign .waiting{
+    color:#c3c4d6;
+    font-size:12px;
+    font-weight:600;
+  }
+  tr.signed-row td.name{ color: var(--purple-1); }
+
+  .sheet-foot{
+    display:flex;
+    justify-content:space-between;
+    margin-top:20px;
+    font-size:11px;
+    color:#9d9eb2;
+  }
+
+  /* ===== Modal ===== */
+  .modal-overlay{
+    position:fixed; inset:0;
+    background: rgba(20,15,50,.45);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+    padding:16px;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal{
+    background:#fff;
+    border-radius:14px;
+    padding:22px;
+    width: 92%;
+    max-width: 460px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+  }
+  .modal h3{ margin:0 0 4px; font-size:16px; }
+  .modal .sub{ font-size:12px; color:var(--muted); margin-bottom:14px; }
+  .modal-actions{
+    display:flex;
+    justify-content:space-between;
+    margin-top:16px;
+    gap:8px;
+  }
+  .modal-actions .left{ display:flex; gap:8px; }
+
+  @media (max-width: 700px){
+    .sheet{ padding: 8mm 5mm; }
+    .sheet-title{ font-size:18px; }
+    table{ font-size:11px; }
+  }
+  @media print{
+    .topbar, .layout > div:first-child{ display:none; }
+    body{ background:#fff; }
+    .sheet{ box-shadow:none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo-badge">✍️</div>
+      <div>
+        <div class="topbar-title">전자서명 등록부 시스템</div>
+        <span class="live-badge" id="modeBadge"><span class="dot"></span>확인 중...</span>
+        <div class="topbar-desc" id="modeDesc">저장 방식을 확인하고 있습니다...</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-pdf" id="btnPdf">🖨️ 인쇄 / PDF 저장</button>
+      <button class="btn btn-reset" id="btnReset">↺ 서명 전체 초기화</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- LEFT PANEL -->
+    <div>
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-left"><span class="ico">📋</span>등록부 설정 (수정 시 자동 저장)</div>
+          <div class="save-indicator" id="saveIndicator">● 저장 완료</div>
+        </div>
+        <label class="field-label">등록부 제목</label>
+        <input class="field-input" id="titleInput" value="제15차 학업성적관리위원회 등록부" />
+        <label class="field-label">일시</label>
+        <input class="field-input" id="dateInput" value="2026. 7. 20.(월)" />
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-left"><span class="ico">✒️</span>서명 입력창</div>
+        </div>
+        <label class="field-label">1. 본인 성명 선택</label>
+        <select class="field-input" id="memberSelect"></select>
+        <div class="hint-note" id="selectHint"></div>
+
+        <label class="field-label">2. 흰색 판에 서명해 주세요</label>
+        <div class="pad-wrap">
+          <canvas id="padCanvas"></canvas>
+          <span class="pad-placeholder" id="padPlaceholder">여기에 마우스/손가락으로 서명</span>
+          <button class="btn btn-ghost-sm pad-clear-btn" id="btnClearPad">↺ 다시 그리기</button>
+        </div>
+
+        <div style="margin-top:14px;">
+          <button class="btn btn-primary" id="btnSubmitSign">✓ 서명 제출하기</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: SHEET PREVIEW -->
+    <div class="sheet-outer">
+      <div class="sheet" id="sheet">
+        <div class="sheet-head">
+          <div class="sheet-title" id="sheetTitle">제15차 학업성적관리위원회 등록부</div>
+          <div class="sheet-date" id="sheetDate">- 일시 : 2026. 7. 20.(월) -</div>
+        </div>
+
+        <table id="signTable">
+          <thead>
+            <tr>
+              <th style="width:9%">연번</th>
+              <th style="width:24%">직위</th>
+              <th style="width:22%">성명</th>
+              <th style="width:45%">서명</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+
+        <div class="sheet-foot">
+          <span>이 영역은 정식 등록부 크기에 맞춰 인쇄됩니다 (A4 사이즈 자동 맞춤)</span>
+          <span id="lastUpdateNote">School Smart System</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm modal for re-sign -->
+  <div class="modal-overlay" id="confirmOverlay">
+    <div class="modal">
+      <h3 id="confirmTitle">이미 서명이 있습니다</h3>
+      <div class="sub">기존 서명을 새 서명으로 덮어쓸까요? 이 작업은 되돌릴 수 없습니다.</div>
+      <div class="modal-actions">
+        <div class="left">
+          <button class="btn btn-ghost-sm" id="btnConfirmCancel">취소</button>
+        </div>
+        <button class="btn btn-primary" style="width:auto;padding:9px 18px;" id="btnConfirmOk">덮어쓰기</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const DOC_KEY = "signature_registry:v1";
+const POLL_MS = 4000;
+
+// ===== 저장소 감지 & 폴백 =====
+// window.storage(공유 저장소)는 claude.ai 안에서만 존재합니다.
+// 파일을 다운로드해서 열거나 외부에서 열면 없기 때문에,
+// 이 경우 이 브라우저 안(localStorage)에만 저장하는 방식으로 자동 전환합니다.
+let storageMode = 'checking'; // 'shared' | 'local'
+
+async function detectStorageMode(){
+  if(typeof window.storage !== 'undefined' && window.storage && typeof window.storage.set === 'function'){
+    try{
+      // 실제로 동작하는지 짧게 테스트
+      const probe = await window.storage.set('__probe__', String(Date.now()), true);
+      if(probe){
+        storageMode = 'shared';
+        applyModeUI();
+        return;
+      }
+    }catch(e){ /* fallthrough */ }
+  }
+  storageMode = 'local';
+  applyModeUI();
+}
+
+function applyModeUI(){
+  const badge = document.getElementById('modeBadge');
+  const desc = document.getElementById('modeDesc');
+  if(storageMode === 'shared'){
+    badge.className = 'live-badge';
+    badge.innerHTML = '<span class="dot"></span>실시간 공유 모드';
+    desc.textContent = '참여자가 각자 기기에서 서명을 제출하면 이 화면에 실시간으로 자동 반영됩니다.';
+  } else {
+    badge.className = 'live-badge local-mode';
+    badge.innerHTML = '<span class="dot"></span>이 브라우저 저장 모드';
+    desc.textContent = '⚠ 공유 저장소를 찾을 수 없어 이 브라우저에만 저장됩니다. 다른 기기와 실시간 공유가 필요하면 아래 안내를 확인해 주세요.';
+  }
+}
+
+async function storageGet(key, shared){
+  if(storageMode === 'shared'){
+    return await window.storage.get(key, shared);
+  }
+  const raw = localStorage.getItem(key);
+  if(raw === null) throw new Error('not found');
+  return { key, value: raw, shared: false };
+}
+
+async function storageSet(key, value, shared){
+  if(storageMode === 'shared'){
+    return await window.storage.set(key, value, shared);
+  }
+  localStorage.setItem(key, value);
+  return { key, value, shared: false };
+}
+
+const defaultMembers = [
+  { pos: "교장", name: "김민규" },
+  { pos: "교감", name: "전소영" },
+  { pos: "교무기획부장", name: "박태환" },
+  { pos: "교육연구부장", name: "황은비" },
+  { pos: "교육과정부장", name: "박소미" },
+  { pos: "학생안전부장", name: "박준섭" },
+  { pos: "교육정보부장", name: "황동하" },
+  { pos: "융합교육부장", name: "한민수" },
+  { pos: "진로진학부장", name: "윤은미" },
+  { pos: "1학년부장", name: "이승희" },
+];
+
+let state = {
+  title: "제15차 학업성적관리위원회 등록부",
+  date: "2026. 7. 20.(월)",
+  members: defaultMembers.map(m => ({ ...m, sign: null })),
+  updatedAt: null
+};
+
+let hasStroke = false;
+let drawing = false;
+
+const titleInput = document.getElementById('titleInput');
+const dateInput = document.getElementById('dateInput');
+const sheetTitle = document.getElementById('sheetTitle');
+const sheetDate = document.getElementById('sheetDate');
+const tableBody = document.getElementById('tableBody');
+const memberSelect = document.getElementById('memberSelect');
+const selectHint = document.getElementById('selectHint');
+const saveIndicator = document.getElementById('saveIndicator');
+const lastUpdateNote = document.getElementById('lastUpdateNote');
+const padCanvas = document.getElementById('padCanvas');
+const padPlaceholder = document.getElementById('padPlaceholder');
+const ctx = padCanvas.getContext('2d');
+const confirmOverlay = document.getElementById('confirmOverlay');
+
+function setSaveIndicator(mode){
+  if(mode === 'saving'){
+    saveIndicator.textContent = '● 저장 중...';
+    saveIndicator.className = 'save-indicator saving';
+  } else if(mode === 'error'){
+    saveIndicator.textContent = '● 저장 실패';
+    saveIndicator.className = 'save-indicator error';
+  } else {
+    saveIndicator.textContent = '● 저장 완료';
+    saveIndicator.className = 'save-indicator';
+  }
+}
+
+function formatUpdatedAt(){
+  if(!state.updatedAt){ lastUpdateNote.textContent = 'School Smart System'; return; }
+  const d = new Date(state.updatedAt);
+  lastUpdateNote.textContent = `마지막 서명 갱신: ${d.toLocaleTimeString('ko-KR')}`;
+}
+
+async function loadState(initial){
+  try{
+    const result = await storageGet(DOC_KEY, true);
+    if(result && result.value){
+      const loaded = JSON.parse(result.value);
+      mergeIncoming(loaded);
+    } else if(initial){
+      renderAll();
+    }
+  }catch(e){
+    if(initial) renderAll();
+  }
+}
+
+function mergeIncoming(loaded){
+  // 입력 중인 필드는 덮어쓰지 않음 (실시간 폴링 중 타이핑 보호)
+  const titleFocused = document.activeElement === titleInput;
+  const dateFocused = document.activeElement === dateInput;
+
+  if(!titleFocused) state.title = loaded.title;
+  if(!dateFocused) state.date = loaded.date;
+  state.members = loaded.members;
+  state.updatedAt = loaded.updatedAt;
+
+  if(!titleFocused) titleInput.value = state.title;
+  if(!dateFocused) dateInput.value = state.date;
+  sheetTitle.textContent = state.title;
+  sheetDate.textContent = `- 일시 : ${state.date} -`;
+  renderTable();
+  renderSelectOptions();
+  formatUpdatedAt();
+}
+
+async function saveState(){
+  setSaveIndicator('saving');
+  state.updatedAt = Date.now();
+  try{
+    const result = await storageSet(DOC_KEY, JSON.stringify(state), true);
+    if(!result){ setSaveIndicator('error'); return; }
+    setSaveIndicator('idle');
+    formatUpdatedAt();
+  }catch(e){
+    setSaveIndicator('error');
+  }
+}
+
+function renderAll(){
+  titleInput.value = state.title;
+  dateInput.value = state.date;
+  sheetTitle.textContent = state.title;
+  sheetDate.textContent = `- 일시 : ${state.date} -`;
+  renderTable();
+  renderSelectOptions();
+  formatUpdatedAt();
+}
+
+function renderTable(){
+  tableBody.innerHTML = '';
+  state.members.forEach((m, idx) => {
+    const tr = document.createElement('tr');
+    if(m.sign) tr.className = 'signed-row';
+
+    const tdNum = document.createElement('td');
+    tdNum.className = 'num';
+    tdNum.textContent = idx + 1;
+
+    const tdPos = document.createElement('td');
+    tdPos.className = 'pos';
+    tdPos.textContent = m.pos;
+
+    const tdName = document.createElement('td');
+    tdName.className = 'name';
+    tdName.textContent = m.name;
+
+    const tdSign = document.createElement('td');
+    tdSign.className = 'sign';
+    if(m.sign){
+      const img = document.createElement('img');
+      img.src = m.sign;
+      tdSign.appendChild(img);
+    } else {
+      const span = document.createElement('span');
+      span.className = 'waiting';
+      span.textContent = '(서명 대기)';
+      tdSign.appendChild(span);
+    }
+
+    tr.appendChild(tdNum);
+    tr.appendChild(tdPos);
+    tr.appendChild(tdName);
+    tr.appendChild(tdSign);
+    tableBody.appendChild(tr);
+  });
+}
+
+function renderSelectOptions(){
+  const prevValue = memberSelect.value;
+  memberSelect.innerHTML = '';
+  state.members.forEach((m, idx) => {
+    const opt = document.createElement('option');
+    opt.value = idx;
+    opt.textContent = `${idx + 1}번: [${m.pos}] ${m.name}${m.sign ? ' (서명완료)' : ''}`;
+    memberSelect.appendChild(opt);
+  });
+  if(prevValue !== '' && Number(prevValue) < state.members.length){
+    memberSelect.value = prevValue;
+  }
+  updateSelectHint();
+}
+
+function updateSelectHint(){
+  const idx = Number(memberSelect.value);
+  const m = state.members[idx];
+  if(!m){ selectHint.textContent=''; return; }
+  if(m.sign){
+    selectHint.textContent = '⚠ 이미 서명이 등록되어 있습니다. 제출 시 기존 서명을 덮어씁니다.';
+    selectHint.className = 'hint-note warn';
+  } else {
+    selectHint.textContent = '';
+    selectHint.className = 'hint-note';
+  }
+}
+memberSelect.addEventListener('change', updateSelectHint);
+
+// --- Title / Date editing ---
+let titleTimer, dateTimer;
+titleInput.addEventListener('input', () => {
+  state.title = titleInput.value;
+  sheetTitle.textContent = state.title;
+  clearTimeout(titleTimer);
+  titleTimer = setTimeout(saveState, 500);
+});
+dateInput.addEventListener('input', () => {
+  state.date = dateInput.value;
+  sheetDate.textContent = `- 일시 : ${state.date} -`;
+  clearTimeout(dateTimer);
+  dateTimer = setTimeout(saveState, 500);
+});
+
+// --- Signature pad ---
+function resizeCanvas(){
+  const rect = padCanvas.getBoundingClientRect();
+  padCanvas.width = rect.width * 2;
+  padCanvas.height = rect.height * 2;
+  ctx.scale(2,2);
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#1c1d2b';
+}
+window.addEventListener('load', () => setTimeout(resizeCanvas, 50));
+window.addEventListener('resize', resizeCanvas);
+
+function getPos(e){
+  const rect = padCanvas.getBoundingClientRect();
+  if(e.touches && e.touches[0]){
+    return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+  }
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+function startDraw(e){
+  e.preventDefault();
+  drawing = true; hasStroke = true;
+  padPlaceholder.style.display = 'none';
+  const p = getPos(e);
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y);
+}
+function moveDraw(e){
+  if(!drawing) return;
+  e.preventDefault();
+  const p = getPos(e);
+  ctx.lineTo(p.x, p.y);
+  ctx.stroke();
+}
+function endDraw(){ drawing = false; }
+
+padCanvas.addEventListener('mousedown', startDraw);
+padCanvas.addEventListener('mousemove', moveDraw);
+window.addEventListener('mouseup', endDraw);
+padCanvas.addEventListener('touchstart', startDraw, {passive:false});
+padCanvas.addEventListener('touchmove', moveDraw, {passive:false});
+padCanvas.addEventListener('touchend', endDraw);
+
+function clearPad(){
+  ctx.clearRect(0,0,padCanvas.width,padCanvas.height);
+  hasStroke = false;
+  padPlaceholder.style.display = 'block';
+}
+document.getElementById('btnClearPad').addEventListener('click', clearPad);
+
+// --- Submit signature ---
+let pendingSubmit = false;
+
+document.getElementById('btnSubmitSign').addEventListener('click', () => {
+  if(!hasStroke){
+    alert('서명을 입력해 주세요.');
+    return;
+  }
+  const idx = Number(memberSelect.value);
+  const m = state.members[idx];
+  if(m.sign){
+    confirmOverlay.classList.add('open');
+    pendingSubmit = true;
+  } else {
+    doSubmit(idx);
+  }
+});
+
+document.getElementById('btnConfirmCancel').addEventListener('click', () => {
+  confirmOverlay.classList.remove('open');
+  pendingSubmit = false;
+});
+document.getElementById('btnConfirmOk').addEventListener('click', () => {
+  confirmOverlay.classList.remove('open');
+  if(pendingSubmit){
+    doSubmit(Number(memberSelect.value));
+    pendingSubmit = false;
+  }
+});
+
+async function doSubmit(idx){
+  const dataUrl = padCanvas.toDataURL('image/png');
+  state.members[idx].sign = dataUrl;
+  renderTable();
+  renderSelectOptions();
+  clearPad();
+  await saveState();
+}
+
+// --- Reset all ---
+document.getElementById('btnReset').addEventListener('click', async () => {
+  if(!confirm('모든 서명을 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+  state.members.forEach(m => m.sign = null);
+  renderTable();
+  renderSelectOptions();
+  await saveState();
+});
+
+// --- PDF export ---
+document.getElementById('btnPdf').addEventListener('click', async () => {
+  const sheet = document.getElementById('sheet');
+  const originalShadow = sheet.style.boxShadow;
+  sheet.style.boxShadow = 'none';
+  try{
+    const canvas = await html2canvas(sheet, { scale: 2, backgroundColor: '#ffffff' });
+    const imgData = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = 210, pageHeight = 297;
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    let heightLeft = imgHeight, position = 0;
+
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, Math.min(imgHeight, pageHeight));
+    heightLeft -= pageHeight;
+    while(heightLeft > 0){
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+    const fileName = (state.title || '전자서명등록부').replace(/[\\/:*?"<>|]/g,'') + '.pdf';
+    pdf.save(fileName);
+  }catch(e){
+    alert('PDF 생성 중 오류가 발생했습니다.');
+  }finally{
+    sheet.style.boxShadow = originalShadow;
+  }
+});
+
+// --- Init + real-time polling ---
+(async () => {
+  await detectStorageMode();
+  await loadState(true);
+  if(storageMode === 'shared'){
+    setInterval(() => loadState(false), POLL_MS);
+  }
+})();
+</script>
+</body>
+</html>
